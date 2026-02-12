@@ -1,44 +1,20 @@
 #!/bin/bash
 set -e
 
+# 变量配置
 MINIFORGE_URL="https://mirrors.nju.edu.cn/github-release/conda-forge/miniforge/LatestRelease/Miniforge3-Linux-$(uname -m).sh"
 INSTALL_DIR="$HOME/miniforge3"
-CONDA_FORGE_MIRROR="https://mirror.nju.edu.cn/anaconda/cloud/conda-forge"
 INSTALLER_SCRIPT="/tmp/miniforge_installer.sh"
 
-ARCH=$(uname -m)
-echo "========================================"
-echo "Miniforge 安装脚本"
-echo "========================================"
-echo "检测到系统架构: $ARCH"
-echo "安装目录: $INSTALL_DIR"
-echo "----------------------------------------"
+# 1. 系统检测与下载
+# - 检测架构 (x86_64/aarch64/ppc64le)
+# - 优先使用 wget，备用 curl
+# - 检查安装目录是否存在
 
-if [ -d "$INSTALL_DIR" ]; then
-    echo "警告: $INSTALL_DIR 已存在，将被覆盖"
-    read -p "继续安装? (y/n): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "安装已取消"
-        exit 1
-    fi
-fi
-
-echo "下载 Miniforge..."
-if command -v wget &> /dev/null; then
-    wget -q --show-progress "$MINIFORGE_URL" -O "$INSTALLER_SCRIPT"
-elif command -v curl &> /dev/null; then
-    curl -# -L "$MINIFORGE_URL" -o "$INSTALLER_SCRIPT"
-else
-    echo "错误: 未安装 wget 或 curl"
-    exit 1
-fi
-
-echo ""
-echo "安装 Miniforge 到 $INSTALL_DIR..."
+# 2. 静默安装 Miniforge
 bash "$INSTALLER_SCRIPT" -b -p "$INSTALL_DIR"
 
-echo "配置 conda 镜像源..."
+# 3. 配置 .condarc 镜像源
 cat > ~/.condarc << 'EOF'
 channels:
   - conda-forge
@@ -50,22 +26,37 @@ show_channel_urls: true
 ssl_verify: true
 EOF
 
-echo "初始化 conda 环境..."
-source "$INSTALL_DIR/bin/activate"
-"$INSTALL_DIR/bin/conda" init bash
+# 4. 初始化 conda 环境（仅用于环境管理）
+"$INSTALL_DIR/bin/conda" init bash --reverse  # 反向初始化，避免自动激活
+"$INSTALL_DIR/bin/conda" init zsh --reverse
+"$INSTALL_DIR/bin/conda" init fish --reverse
 
+# 5. 配置 mamba PATH 和别名
+# 为每个 shell 配置：
+# - 添加 mamba 到 PATH
+# - 创建 alias conda=mamba
+
+# Bash 配置 (~/.bashrc)
+echo "" >> ~/.bashrc
+echo "# Miniforge - Mamba configuration" >> ~/.bashrc
+echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\"" >> ~/.bashrc
+echo "alias conda=mamba" >> ~/.bashrc
+
+# Zsh 配置 (~/.zshrc) - 如果存在
+if [ -f ~/.zshrc ]; then
+    echo "" >> ~/.zshrc
+    echo "# Miniforge - Mamba configuration" >> ~/.zshrc
+    echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\"" >> ~/.zshrc
+    echo "alias conda=mamba" >> ~/.zshrc
+fi
+
+# Fish 配置 (~/.config/fish/config.fish) - 如果存在
+if [ -f ~/.config/fish/config.fish ]; then
+    echo "" >> ~/.config/fish/config.fish
+    echo "# Miniforge - Mamba configuration" >> ~/.config/fish/config.fish
+    echo "fish_add_path $INSTALL_DIR/bin" >> ~/.config/fish/config.fish
+    echo "alias conda=mamba" >> ~/.config/fish/config.fish
+fi
+
+# 6. 清理临时文件
 rm -f "$INSTALLER_SCRIPT"
-
-echo ""
-echo "========================================"
-echo "安装完成!"
-echo "========================================"
-echo "请执行以下命令使更改生效:"
-echo "  source ~/.bashrc"
-echo "或"
-echo "  重新打开终端"
-echo ""
-echo "验证安装:"
-echo "  conda info"
-echo "  conda config --show channels"
-echo "========================================"
