@@ -1,0 +1,2 @@
+# miniscript
+miniforge bash script
